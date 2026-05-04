@@ -1,66 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Esquires Coffee — Allergen Menu</title>
+<style>
+body{margin:0;background:#EEF1EA;color:#202323;font-family:Arial,sans-serif;max-width:480px;margin:auto}
+.header{background:#202323;color:#D4BB96;padding:16px;border-bottom:2px solid #B19664}
+.logo{border:1.5px solid #D4BB96;padding:6px 10px;font-weight:800;letter-spacing:2px;display:inline-block}
+.badge{float:right;border:1px solid #D4BB96;padding:5px 8px;font-size:12px}
+.search{padding:12px;background:#FAF7F2;border-bottom:1px solid #E8DDD0}
+.search input{width:100%;padding:10px;font-size:15px;border:1px solid #E8DDD0}
+.section{margin:12px}
+.section-title{background:#D4BB96;padding:12px;font-weight:800;text-transform:uppercase}
+.item{background:#FDFAF6;border:1px solid #E8DDD0;border-left:4px solid #62704D;padding:12px;margin-bottom:8px}
+.item.warn{border-left-color:#92670E}
+.item.danger{border-left-color:#9C4D52}
+.name{font-family:Georgia,serif;font-size:18px;font-weight:600}
+.desc{font-size:13px;color:#6C6D6D;margin-top:5px;line-height:1.4}
+.tag,.allergen{font-size:11px;padding:3px 6px;margin:3px;display:inline-block;border-radius:2px}
+.tag{border:1px solid #B19664;background:#FAF5EE}
+.contains{background:#F7EDEE;color:#9C4D52;border:1px solid #D9A0A5}
+.may{background:#FEF5E0;color:#92670E;border:1px solid #E8C97A}
+.free{background:#EEF1EA;color:#62704D;border:1px solid #B5C4A0}
+.loading{padding:40px 20px;text-align:center;color:#6C6D6D}
+.footer{background:#202323;color:#D4BB96;padding:18px;font-size:12px;text-align:center;line-height:1.6}
+</style>
+</head>
+
+<body>
+
+<div class="header">
+  <span class="logo">ESQUIRES</span>
+  <span class="badge">Allergen Menu</span>
+</div>
+
+<div class="search">
+  <input id="search" type="search" placeholder="🔍 Search menu..." oninput="renderMenu()" />
+</div>
+
+<div id="menu">
+  <div class="loading">Loading menu...</div>
+</div>
+
+<div class="footer">
+  <strong>Always tell a team member about your allergy before ordering.</strong><br>
+  Our kitchen handles all 14 major allergens. Cross-contamination cannot be fully eliminated.
+</div>
+
 <script>
 const API_URL = "https://esquires-menu-api.onrender.com/customer-menu";
+let MENU = [];
+
+const A14 = [
+  { k: "gluten", l: "Gluten", i: "🌾" },
+  { k: "milk", l: "Milk", i: "🥛" },
+  { k: "eggs", l: "Eggs", i: "🥚" },
+  { k: "nuts", l: "Tree Nuts", i: "🌰" },
+  { k: "peanuts", l: "Peanuts", i: "🥜" },
+  { k: "soy", l: "Soy", i: "🫘" },
+  { k: "sesame", l: "Sesame", i: "⚫" },
+  { k: "fish", l: "Fish", i: "🐟" },
+  { k: "crustaceans", l: "Crustaceans", i: "🦞" },
+  { k: "molluscs", l: "Molluscs", i: "🦪" },
+  { k: "celery", l: "Celery", i: "🌿" },
+  { k: "mustard", l: "Mustard", i: "🌻" },
+  { k: "sulphites", l: "Sulphites", i: "🍷" },
+  { k: "lupin", l: "Lupin", i: "🌸" }
+];
+
+function niceCategory(cat) {
+  return (cat || "Menu").replace(/-/g, " ").replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function itemStatus(item) {
+  const al = item.al || item.allergens || {};
+  if (A14.some(a => al[a.k] === "C")) return "danger";
+  if (A14.some(a => al[a.k] === "M")) return "warn";
+  return "safe";
+}
+
+function buildAllergens(item) {
+  const al = item.al || item.allergens || {};
+  const contains = A14.filter(a => al[a.k] === "C");
+  const may = A14.filter(a => al[a.k] === "M");
+
+  if (!contains.length && !may.length) {
+    return `<span class="allergen free">✓ No major allergens</span>`;
+  }
+
+  return [
+    ...contains.map(a => `<span class="allergen contains">${a.i} ${a.l}</span>`),
+    ...may.map(a => `<span class="allergen may">${a.i} May: ${a.l}</span>`)
+  ].join("");
+}
+
+function buildTags(item) {
+  const tags = [];
+  if (item.vegan) tags.push("Vegan");
+  if (item.vg && !item.vegan) tags.push("Vegetarian");
+  if (item.gf) tags.push("GF");
+  if (item.kcal) tags.push(item.kcal);
+  return tags.map(t => `<span class="tag">${t}</span>`).join("");
+}
+
+function renderMenu() {
+  const container = document.getElementById("menu");
+  const q = document.getElementById("search").value.toLowerCase().trim();
+
+  const filtered = MENU.filter(item =>
+    !q ||
+    (item.name || "").toLowerCase().includes(q) ||
+    (item.desc || item.description || "").toLowerCase().includes(q)
+  );
+
+  if (!filtered.length) {
+    container.innerHTML = `<div class="loading">No menu items found. Publish your recipes from the recipe app first.</div>`;
+    return;
+  }
+
+  const cats = [...new Set(filtered.map(i => i.cat || i.category || "menu"))];
+
+  container.innerHTML = cats.map(cat => {
+    const items = filtered.filter(i => (i.cat || i.category || "menu") === cat);
+
+    return `
+      <div class="section">
+        <div class="section-title">${niceCategory(cat)} (${items.length})</div>
+        ${items.map(item => `
+          <div class="item ${itemStatus(item)}">
+            <div class="name">${item.name || "Unnamed item"}</div>
+            <div class="desc">${item.desc || item.description || ""}</div>
+            <div>${buildTags(item)}</div>
+            <div>${buildAllergens(item)}</div>
+            ${item.swapNote ? `<div class="desc"><strong>Swap:</strong> ${item.swapNote}</div>` : ""}
+          </div>
+        `).join("")}
+      </div>
+    `;
+  }).join("");
+}
 
 async function loadMenu() {
-    const container = document.getElementById("menu");
-    container.innerHTML = "<p>Loading menu...</p>";
+  const container = document.getElementById("menu");
 
-    try {
-        const response = await fetch(API_URL);
+  try {
+    const res = await fetch(API_URL);
 
-        if (!response.ok) {
-            throw new Error("API error: " + response.status);
-        }
-
-        const data = await response.json();
-
-        renderMenu(data);
-
-    } catch (error) {
-        console.error(error);
-        container.innerHTML = `
-            <p style="color:red;">
-                Failed to load menu.<br>
-                Check API connection.
-            </p>
-        `;
+    if (!res.ok) {
+      throw new Error("API failed: " + res.status);
     }
+
+    MENU = await res.json();
+
+    if (!Array.isArray(MENU)) {
+      throw new Error("Menu data is not an array");
+    }
+
+    renderMenu();
+  } catch (err) {
+    console.error(err);
+    container.innerHTML = `<div class="loading">Menu could not load. API connection failed.</div>`;
+  }
 }
 
-function renderMenu(data) {
-    const container = document.getElementById("menu");
-    container.innerHTML = "";
-
-    data.forEach(item => {
-        const card = document.createElement("div");
-        card.style.border = "1px solid #ddd";
-        card.style.padding = "16px";
-        card.style.marginBottom = "16px";
-        card.style.borderRadius = "12px";
-        card.style.background = "#fff";
-
-        card.innerHTML = `
-            <h2>${item.name}</h2>
-            <p><strong>Price:</strong> £${item.price}</p>
-
-            ${item.description ? `<p>${item.description}</p>` : ""}
-
-            ${item.allergens && item.allergens.length > 0 ? `
-                <p><strong>Allergens:</strong> ${item.allergens.join(", ")}</p>
-            ` : ""}
-
-            ${item.customisations && item.customisations.length > 0 ? `
-                <p><strong>Customise:</strong></p>
-                <ul>
-                    ${item.customisations.map(c => `<li>${c}</li>`).join("")}
-                </ul>
-            ` : ""}
-        `;
-
-        container.appendChild(card);
-    });
-}
-
-// Load on page open
 loadMenu();
 </script>
+
+</body>
+</html>
