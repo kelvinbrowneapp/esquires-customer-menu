@@ -1,39 +1,66 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Esquires Coffee — Menu</title>
-</head>
-<body>
-<h2>Loading menu...</h2>
-
-<div id="menu"></div>
-
 <script>
 const API_URL = "https://esquires-menu-api.onrender.com/customer-menu";
-let MENU = [];
 
 async function loadMenu() {
-  try {
-    const res = await fetch(API_URL);
-    MENU = await res.json();
-
     const container = document.getElementById("menu");
-    container.innerHTML = MENU.map(item => `
-      <div style="padding:10px;border-bottom:1px solid #ccc;">
-        <strong>${item.name}</strong><br/>
-        ${item.desc || ""}
-      </div>
-    `).join("");
+    container.innerHTML = "<p>Loading menu...</p>";
 
-  } catch (e) {
-    document.getElementById("menu").innerHTML = "Menu failed to load";
-  }
+    try {
+        const response = await fetch(API_URL);
+
+        if (!response.ok) {
+            throw new Error("API error: " + response.status);
+        }
+
+        const data = await response.json();
+
+        renderMenu(data);
+
+    } catch (error) {
+        console.error(error);
+        container.innerHTML = `
+            <p style="color:red;">
+                Failed to load menu.<br>
+                Check API connection.
+            </p>
+        `;
+    }
 }
 
+function renderMenu(data) {
+    const container = document.getElementById("menu");
+    container.innerHTML = "";
+
+    data.forEach(item => {
+        const card = document.createElement("div");
+        card.style.border = "1px solid #ddd";
+        card.style.padding = "16px";
+        card.style.marginBottom = "16px";
+        card.style.borderRadius = "12px";
+        card.style.background = "#fff";
+
+        card.innerHTML = `
+            <h2>${item.name}</h2>
+            <p><strong>Price:</strong> £${item.price}</p>
+
+            ${item.description ? `<p>${item.description}</p>` : ""}
+
+            ${item.allergens && item.allergens.length > 0 ? `
+                <p><strong>Allergens:</strong> ${item.allergens.join(", ")}</p>
+            ` : ""}
+
+            ${item.customisations && item.customisations.length > 0 ? `
+                <p><strong>Customise:</strong></p>
+                <ul>
+                    ${item.customisations.map(c => `<li>${c}</li>`).join("")}
+                </ul>
+            ` : ""}
+        `;
+
+        container.appendChild(card);
+    });
+}
+
+// Load on page open
 loadMenu();
 </script>
-
-</body>
-</html>
